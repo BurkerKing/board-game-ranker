@@ -4,8 +4,8 @@
   "description": "A shared phone ranking flow for board game preferences.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f2e8",
-  "theme_color": "#f7f2e8",
+  "background_color": "#f8f1df",
+  "theme_color": "#f8f1df",
   "icons": [
     {
       "src": "/icons/icon-192.svg",

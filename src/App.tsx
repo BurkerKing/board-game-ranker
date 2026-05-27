@@ -23,10 +23,10 @@ function GameCard({
   return (
     <article
       className={`flex min-h-64 flex-1 flex-col overflow-hidden rounded-lg border bg-linen shadow-soft transition ${
-        selectedBy.length ? 'border-moss ring-4 ring-moss/20' : 'border-stone-200'
+        selectedBy.length ? 'border-lagoon ring-4 ring-lagoon/20 shadow-lift' : 'border-amber-200'
       }`}
     >
-      <div className="relative flex aspect-[3/4] items-center justify-center bg-stone-100">
+      <div className="relative flex aspect-[3/4] items-center justify-center bg-mint">
         {game.thumbnailUrl ? (
           <img
             src={game.thumbnailUrl}
@@ -38,12 +38,12 @@ function GameCard({
             }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 px-3 text-center text-sm font-semibold text-stone-500">
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-mint via-amber-50 to-blush px-3 text-center text-sm font-semibold text-stone-600">
             {game.title}
           </div>
         )}
         {selectedBy.length > 0 && (
-          <div className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-moss text-white shadow-soft">
+          <div className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-lagoon text-white shadow-soft">
             <Check size={25} strokeWidth={3} />
           </div>
         )}
@@ -53,7 +53,7 @@ function GameCard({
         <button
           type="button"
           onClick={onNeverPlayed}
-          className="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-700 active:scale-[0.99]"
+          className="min-h-11 rounded-md border border-clay/30 bg-blush/50 px-3 text-sm font-semibold text-clay active:scale-[0.99]"
         >
           Never Played
         </button>
@@ -79,8 +79,8 @@ function ChoiceButton({
       onClick={onClick}
       className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-base font-bold transition active:scale-[0.99] ${
         active
-          ? 'border-moss bg-moss text-white shadow-soft'
-          : 'border-stone-300 bg-white text-ink hover:border-stone-400'
+          ? 'border-lagoon bg-lagoon text-white shadow-soft'
+          : 'border-amber-200 bg-white text-ink hover:border-saffron'
       }`}
       aria-pressed={active}
     >
@@ -96,7 +96,7 @@ function ImportPanel({ onImport, isImporting, error }: { onImport: () => void; i
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
       <div className="space-y-6">
         <div>
-          <p className="text-sm font-bold uppercase tracking-wide text-moss">Brian and Sarah</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-lagoon">Brian and Sarah</p>
           <h1 className="mt-2 text-4xl font-black leading-tight text-ink">Board game preference ranking</h1>
           <p className="mt-4 text-lg leading-relaxed text-stone-700">
             Import the collection, then compare two games at a time. Progress saves automatically.
@@ -106,12 +106,12 @@ function ImportPanel({ onImport, isImporting, error }: { onImport: () => void; i
           type="button"
           onClick={onImport}
           disabled={isImporting}
-          className="flex min-h-14 w-full items-center justify-center gap-3 rounded-md bg-ink px-5 text-lg font-bold text-white shadow-soft disabled:cursor-wait disabled:opacity-70"
+          className="flex min-h-14 w-full items-center justify-center gap-3 rounded-md bg-lagoon px-5 text-lg font-bold text-white shadow-lift disabled:cursor-wait disabled:opacity-70"
         >
           <Download size={22} />
           {isImporting ? 'Importing games...' : 'Import Google Sheet'}
         </button>
-        {error && <p className="rounded-md border border-clay/30 bg-clay/10 p-3 text-sm font-semibold text-clay">{error}</p>}
+        {error && <p className="rounded-md border border-clay/30 bg-blush p-3 text-sm font-semibold text-clay">{error}</p>}
       </div>
     </main>
   )
@@ -138,7 +138,7 @@ function CompareScreen({
     return (
       <section className="flex flex-1 items-center justify-center px-5 text-center">
         <div>
-          <Trophy className="mx-auto text-moss" size={42} />
+          <Trophy className="mx-auto text-saffron" size={42} />
           <h2 className="mt-3 text-2xl font-black text-ink">No more matchups available</h2>
           <p className="mt-2 text-stone-600">Add more games or check the summary.</p>
         </div>
@@ -175,7 +175,7 @@ function CompareScreen({
           onNeverPlayed={() => neverPlayed(left.id)}
         />
         <div className="flex items-center justify-center">
-          <div className="rounded-full bg-white px-2 py-1 text-xs font-black text-stone-500 shadow-sm">OR</div>
+          <div className="rounded-full bg-saffron px-2 py-1 text-xs font-black text-white shadow-sm">OR</div>
         </div>
         <GameCard
           game={right}
@@ -186,8 +186,8 @@ function CompareScreen({
 
       <div className="space-y-3">
         {USERS.map((user) => (
-          <div key={user} className="rounded-lg border border-stone-200 bg-white/70 p-2">
-            <div className="mb-2 px-1 text-sm font-black text-stone-600">{user}</div>
+          <div key={user} className="rounded-lg border border-amber-200 bg-white/80 p-2 shadow-sm">
+            <div className="mb-2 px-1 text-sm font-black text-lagoon">{user}</div>
             <div className="flex gap-2">
               <ChoiceButton user={user} side="left" active={choices[user] === leftGame.id} onClick={() => select(user, leftGame.id)} />
               <ChoiceButton user={user} side="right" active={choices[user] === rightGame.id} onClick={() => select(user, rightGame.id)} />
@@ -200,7 +200,7 @@ function CompareScreen({
         type="button"
         disabled={!canSubmit}
         onClick={submit}
-        className="min-h-14 rounded-md bg-clay px-5 text-xl font-black text-white shadow-soft disabled:bg-stone-300 disabled:text-stone-500"
+        className="min-h-14 rounded-md bg-berry px-5 text-xl font-black text-white shadow-lift disabled:bg-stone-300 disabled:text-stone-500"
       >
         OK
       </button>
@@ -214,7 +214,7 @@ function RankingsScreen({ state }: { state: AppState }) {
 
   return (
     <main className="flex-1 px-4 pb-24 pt-4">
-      <div className="mb-4 grid grid-cols-3 rounded-lg border border-stone-200 bg-white p-1">
+      <div className="mb-4 grid grid-cols-3 rounded-lg border border-amber-200 bg-white p-1 shadow-sm">
         {[
           ['combined', 'Combined'],
           ['Brian', 'Brian'],
@@ -224,7 +224,7 @@ function RankingsScreen({ state }: { state: AppState }) {
             key={value}
             type="button"
             onClick={() => setTab(value as RankingTab)}
-            className={`min-h-10 rounded-md text-sm font-black ${tab === value ? 'bg-ink text-white' : 'text-stone-600'}`}
+            className={`min-h-10 rounded-md text-sm font-black ${tab === value ? 'bg-lagoon text-white' : 'text-stone-600'}`}
           >
             {label}
           </button>
@@ -233,16 +233,16 @@ function RankingsScreen({ state }: { state: AppState }) {
 
       <div className="space-y-2">
         {rankings.map(({ game, rating }, index) => (
-          <div key={game.id} className="grid grid-cols-[2.2rem_3rem_1fr_auto] items-center gap-3 rounded-lg border border-stone-200 bg-white p-2">
-            <div className="text-center text-lg font-black text-stone-500">{index + 1}</div>
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-stone-100 text-xs font-bold text-stone-500">
+          <div key={game.id} className="grid grid-cols-[2.2rem_3rem_1fr_auto] items-center gap-3 rounded-lg border border-amber-200 bg-white p-2 shadow-sm">
+            <div className="text-center text-lg font-black text-saffron">{index + 1}</div>
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-mint text-xs font-bold text-moss">
               {game.thumbnailUrl ? <img src={game.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : game.title.slice(0, 1)}
             </div>
             <div className="min-w-0">
               <div className="truncate font-black text-ink">{game.title}</div>
               <div className="text-sm font-semibold text-stone-500">{rating.comparisons} comparisons</div>
             </div>
-            <div className="text-right text-lg font-black text-moss">{rating.elo}</div>
+            <div className="text-right text-lg font-black text-lagoon">{rating.elo}</div>
           </div>
         ))}
       </div>
@@ -263,8 +263,8 @@ function SummaryScreen({ state }: { state: AppState }) {
           ['Most divisive game', stats.mostDivisive],
           ['Top shared game', stats.topShared],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="text-sm font-bold uppercase tracking-wide text-stone-500">{label}</div>
+          <div key={label} className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
+            <div className="text-sm font-bold uppercase tracking-wide text-lagoon">{label}</div>
             <div className="mt-1 text-2xl font-black text-ink">{value}</div>
           </div>
         ))}
@@ -307,17 +307,17 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-paper text-ink">
-      <header className="sticky top-0 z-10 border-b border-stone-200 bg-paper/95 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.6rem)] backdrop-blur">
+    <div className="flex min-h-dvh flex-col bg-paper/80 text-ink">
+      <header className="sticky top-0 z-10 border-b border-amber-200 bg-linen/95 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.6rem)] backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-wide text-moss">Game Rank</div>
+            <div className="text-xs font-black uppercase tracking-wide text-lagoon">Game Rank</div>
             <div className="text-sm font-bold text-stone-600">{state.history.length} comparisons saved</div>
           </div>
           <button
             type="button"
             onClick={clearAll}
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-amber-200 bg-white text-clay"
             aria-label="Reset app"
             title="Reset app"
           >
@@ -330,7 +330,7 @@ export default function App() {
       {screen === 'rankings' && <RankingsScreen state={state} />}
       {screen === 'summary' && <SummaryScreen state={state} />}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-stone-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-2 backdrop-blur">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-amber-200 bg-linen/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.4rem)] pt-2 backdrop-blur">
         <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
           {[
             ['compare', 'Compare'],
@@ -342,7 +342,7 @@ export default function App() {
               type="button"
               onClick={() => setScreen(value as Screen)}
               className={`min-h-11 rounded-md text-sm font-black ${
-                screen === value ? 'bg-ink text-white' : 'bg-stone-100 text-stone-600'
+                screen === value ? 'bg-lagoon text-white' : 'bg-mint text-stone-700'
               }`}
             >
               {label}
