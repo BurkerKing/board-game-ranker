@@ -1,4 +1,4 @@
-import { Check, Download, FileDown, Play, RefreshCcw, SquareCheckBig, Trophy } from 'lucide-react'
+import { BarChart3, Check, Download, FileDown, Play, RefreshCcw, SquareCheckBig, Trash2, Trophy } from 'lucide-react'
 import type { Dispatch, SetStateAction, SyntheticEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { importGamesFromSheet } from './importSheet'
@@ -68,6 +68,44 @@ function exportRankingsCsv(session: RankingSession) {
     rows.map((row) => row.map(csvCell).join(',')).join('\n'),
     'text/csv',
   )
+}
+
+function rankLabel(index: number) {
+  return ['First', 'Second', 'Third', 'Fourth', 'Fifth'][index] || `${index + 1}`
+}
+
+function topFiveRows(session: RankingSession) {
+  const finalRankings = session.finalRankings || freezeRankings(session)
+  return Array.from({ length: 5 }, (_, index) => [
+    rankLabel(index),
+    finalRankings.Brian[index]?.title || '',
+    finalRankings.Sarah[index]?.title || '',
+    finalRankings.combined[index]?.title || '',
+  ])
+}
+
+function exportTopFiveCsv(session: RankingSession) {
+  const rows = [
+    [formatDate(session.finishedAt || session.createdAt), 'Brian', 'Sarah', 'Combined'],
+    ...topFiveRows(session),
+  ]
+  downloadText(
+    `${safeFileName(session.sessionName)}-top-five.csv`,
+    rows.map((row) => row.map(csvCell).join(',')).join('\n'),
+    'text/csv',
+  )
+}
+
+function exportAllTopFiveCsv(sessions: RankingSession[]) {
+  const finishedSessions = sessions.filter((session) => session.status === 'finished')
+  const rows = finishedSessions.flatMap((session, index) => {
+    const section = [
+      [formatDate(session.finishedAt || session.createdAt), 'Brian', 'Sarah', 'Combined'],
+      ...topFiveRows(session),
+    ]
+    return index === 0 ? section : [['', '', '', ''], ...section]
+  })
+  downloadText('board-game-session-top-fives.csv', rows.map((row) => row.map(csvCell).join(',')).join('\n'), 'text/csv')
 }
 
 function GameCard({
@@ -391,6 +429,7 @@ function SessionsScreen({
   onOpenSession,
   onFinish,
   onStart,
+  onDeleteSession,
   isImporting,
   error,
 }: {
@@ -398,9 +437,11 @@ function SessionsScreen({
   onOpenSession: (sessionId: string) => void
   onFinish: () => void
   onStart: (sessionName: string) => void
+  onDeleteSession: (sessionId: string) => void
   isImporting: boolean
   error?: string
 }) {
+  const [expandedSessionId, setExpandedSessionId] = useState<string>()
   const activeSession = state.sessions.find((session) => session.sessionId === state.activeSessionId)
   const finishedSessions = state.sessions
     .filter((session) => session.status === 'finished')
@@ -445,7 +486,19 @@ function SessionsScreen({
       )}
 
       <section className="mt-6">
-        <h2 className="text-xl font-black text-ink">Finished sessions</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-black text-ink">Finished sessions</h2>
+          {finishedSessions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => exportAllTopFiveCsv(finishedSessions)}
+              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-saffron px-3 text-sm font-black text-white"
+            >
+              <FileDown size={17} />
+              Top 5s
+            </button>
+          )}
+        </div>
         <div className="mt-3 space-y-3">
           {finishedSessions.length === 0 && (
             <p className="rounded-lg border border-amber-200 bg-white p-4 text-sm font-semibold text-stone-600">
@@ -454,6 +507,8 @@ function SessionsScreen({
           )}
           {finishedSessions.map((session) => {
             const stats = session.summary || summaryStats(session)
+            const expanded = expandedSessionId === session.sessionId
+            const topRows = topFiveRows(session)
             return (
               <article key={session.sessionId} className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -467,7 +522,39 @@ function SessionsScreen({
                   <div>Excluded: {stats.excluded}</div>
                   <div>Top: {stats.topShared}</div>
                 </div>
+                {expanded && (
+                  <div className="mt-4 rounded-lg border border-amber-100 bg-linen p-3">
+                    <div className="grid grid-cols-2 gap-2 text-sm font-semibold text-stone-700">
+                      <div>Agreement: {stats.agreement}%</div>
+                      <div>Divisive: {stats.mostDivisive}</div>
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-md border border-amber-200 bg-white">
+                      <div className="grid grid-cols-[4.6rem_1fr_1fr_1fr] bg-mint text-xs font-black uppercase tracking-wide text-lagoon">
+                        <div className="p-2">Rank</div>
+                        <div className="p-2">Brian</div>
+                        <div className="p-2">Sarah</div>
+                        <div className="p-2">Combined</div>
+                      </div>
+                      {topRows.map(([rank, brian, sarah, combined]) => (
+                        <div key={rank} className="grid grid-cols-[4.6rem_1fr_1fr_1fr] border-t border-amber-100 text-xs font-semibold text-stone-700">
+                          <div className="p-2 font-black text-ink">{rank}</div>
+                          <div className="min-w-0 truncate p-2">{brian}</div>
+                          <div className="min-w-0 truncate p-2">{sarah}</div>
+                          <div className="min-w-0 truncate p-2">{combined}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSessionId(expanded ? undefined : session.sessionId)}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-mint px-3 text-sm font-black text-lagoon"
+                  >
+                    <BarChart3 size={18} />
+                    Stats
+                  </button>
                   <button
                     type="button"
                     onClick={() => exportSessionJson(session)}
@@ -483,6 +570,22 @@ function SessionsScreen({
                   >
                     <FileDown size={18} />
                     CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportTopFiveCsv(session)}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-saffron px-3 text-sm font-black text-white"
+                  >
+                    <FileDown size={18} />
+                    Top 5
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteSession(session.sessionId)}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-md border border-clay/30 bg-blush px-3 text-sm font-black text-clay"
+                  >
+                    <Trash2 size={18} />
+                    Delete
                   </button>
                 </div>
               </article>
@@ -568,6 +671,16 @@ export default function App() {
     setScreen('compare')
   }
 
+  function deleteSession(sessionId: string) {
+    const session = state.sessions.find((item) => item.sessionId === sessionId)
+    if (!session) return
+    if (!window.confirm(`Delete "${session.sessionName}" from this device? Export it first if you want a backup.`)) return
+    setState((current) => ({
+      sessions: current.sessions.filter((item) => item.sessionId !== sessionId),
+      activeSessionId: current.activeSessionId === sessionId ? undefined : current.activeSessionId,
+    }))
+  }
+
   function clearAll() {
     resetState()
     setState(createState())
@@ -609,6 +722,7 @@ export default function App() {
           onOpenSession={openSession}
           onFinish={finishActiveSession}
           onStart={startSession}
+          onDeleteSession={deleteSession}
           isImporting={isImporting}
           error={error}
         />
@@ -619,6 +733,7 @@ export default function App() {
           onOpenSession={openSession}
           onFinish={finishActiveSession}
           onStart={startSession}
+          onDeleteSession={deleteSession}
           isImporting={isImporting}
           error={error}
         />
