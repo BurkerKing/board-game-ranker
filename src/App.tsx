@@ -81,11 +81,11 @@ function GameCard({
 }) {
   return (
     <article
-      className={`flex min-h-64 flex-1 flex-col overflow-hidden rounded-lg border bg-linen shadow-soft transition ${
+      className={`flex flex-1 flex-col overflow-hidden rounded-lg border bg-linen shadow-soft transition ${
         selectedBy.length ? 'border-lagoon ring-4 ring-lagoon/20 shadow-lift' : 'border-amber-200'
       }`}
     >
-      <div className="relative flex aspect-[3/4] items-center justify-center bg-mint">
+      <div className="relative flex aspect-square max-h-44 items-center justify-center bg-mint">
         {game.thumbnailUrl ? (
           <img
             src={game.thumbnailUrl}
@@ -107,12 +107,12 @@ function GameCard({
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col justify-between gap-3 p-3">
-        <h2 className="text-balance text-center text-lg font-bold leading-tight text-ink">{game.title}</h2>
+      <div className="flex flex-1 flex-col justify-between gap-2 p-2.5">
+        <h2 className="text-balance text-center text-base font-bold leading-tight text-ink">{game.title}</h2>
         <button
           type="button"
           onClick={onNeverPlayed}
-          className="min-h-11 rounded-md border border-clay/30 bg-blush/50 px-3 text-sm font-semibold text-clay active:scale-[0.99]"
+          className="min-h-10 rounded-md border border-clay/30 bg-blush/50 px-3 text-sm font-semibold text-clay active:scale-[0.99]"
         >
           Never Played
         </button>
@@ -247,8 +247,8 @@ function CompareScreen({
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-4 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+    <main className="flex flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+6.75rem)] pt-2">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5">
         <GameCard game={leftGame} selectedBy={USERS.filter((user) => choices[user] === leftGame.id)} onNeverPlayed={() => neverPlayed(leftGame.id)} />
         <div className="flex items-center justify-center">
           <div className="rounded-full bg-saffron px-2 py-1 text-xs font-black text-white shadow-sm">OR</div>
@@ -256,10 +256,10 @@ function CompareScreen({
         <GameCard game={rightGame} selectedBy={USERS.filter((user) => choices[user] === rightGame.id)} onNeverPlayed={() => neverPlayed(rightGame.id)} />
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {USERS.map((user) => (
           <div key={user} className="rounded-lg border border-amber-200 bg-white/80 p-2 shadow-sm">
-            <div className="mb-2 px-1 text-sm font-black text-lagoon">{user}</div>
+            <div className="mb-1.5 px-1 text-sm font-black text-lagoon">{user}</div>
             <div className="flex gap-2">
               <ChoiceButton user={user} side="left" active={choices[user] === leftGame.id} onClick={() => select(user, leftGame.id)} />
               <ChoiceButton user={user} side="right" active={choices[user] === rightGame.id} onClick={() => select(user, rightGame.id)} />
@@ -272,7 +272,7 @@ function CompareScreen({
         type="button"
         disabled={!canSubmit}
         onClick={submit}
-        className="min-h-14 rounded-md bg-berry px-5 text-xl font-black text-white shadow-lift disabled:bg-stone-300 disabled:text-stone-500"
+        className="min-h-12 rounded-md bg-berry px-5 text-xl font-black text-white shadow-lift disabled:bg-stone-300 disabled:text-stone-500"
       >
         OK
       </button>
@@ -415,7 +415,7 @@ function SessionsScreen({
           <div className="text-sm font-black uppercase tracking-wide text-lagoon">Current active session</div>
           <h2 className="mt-1 text-2xl font-black text-ink">{activeSession.sessionName}</h2>
           <p className="mt-1 text-sm font-semibold text-stone-600">
-            {activeSession.comparisons.length} comparisons · {activeSession.games.filter((game) => game.excluded).length} excluded
+            {activeSession.comparisons.length} comparisons - {activeSession.games.filter((game) => game.excluded).length} excluded
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
@@ -585,7 +585,7 @@ export default function App() {
           <div>
             <div className="text-xs font-black uppercase tracking-wide text-lagoon">Game Rank</div>
             <div className="text-sm font-bold text-stone-600">
-              {activeSession ? `${activeSession.sessionName} · ${activeSession.comparisons.length} saved` : `${state.sessions.length} sessions saved`}
+              {activeSession ? `${activeSession.sessionName} - ${activeSession.comparisons.length} saved` : `${state.sessions.length} sessions saved`}
             </div>
           </div>
           <button
