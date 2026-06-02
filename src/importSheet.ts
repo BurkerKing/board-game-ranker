@@ -3,7 +3,7 @@ import type { Game } from './types'
 const SHEET_ID = '1OATCavnc3lgVzES7GdzxsXr6OUBoNhfRB6EHbu_R7_M'
 const CSV_URLS = [
   `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`,
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1`,
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Games`,
   `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?output=csv`,
 ]
 
