@@ -1,4 +1,4 @@
-const CACHE_NAME = 'board-game-ranker-v2'
+const CACHE_NAME = 'board-game-ranker-v3'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {

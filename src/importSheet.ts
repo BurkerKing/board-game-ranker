@@ -12,6 +12,11 @@ function parseNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function parseImageUrl(value: string): string | undefined {
+  const url = value.trim()
+  return /^https?:\/\//i.test(url) ? url : undefined
+}
+
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []
@@ -106,6 +111,7 @@ export async function importGamesFromSheet(): Promise<Game[]> {
         bestPlayerCount: row[11]?.trim() || undefined,
         playedCount: parseNumber(row[12] || ''),
         lastPlayed: row[13]?.trim() || undefined,
+        thumbnailUrl: parseImageUrl(row[14] || ''),
         createdAt: now,
       })
     })

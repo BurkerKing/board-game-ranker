@@ -37,12 +37,49 @@ export type Matchup = {
   rightId: string
 }
 
-export type AppState = {
+export type SessionStatus = 'active' | 'finished'
+
+export type SummaryStats = {
+  comparisons: number
+  excluded: number
+  agreement: number
+  mostDivisive: string
+  topShared: string
+}
+
+export type RankingSnapshotEntry = {
+  rank: number
+  gameId: string
+  title: string
+  elo: number
+  comparisons: number
+}
+
+export type FrozenRankings = {
+  combined: RankingSnapshotEntry[]
+  Brian: RankingSnapshotEntry[]
+  Sarah: RankingSnapshotEntry[]
+}
+
+export type RankingSession = {
+  sessionId: string
+  sessionName: string
+  createdAt: string
+  startedAt: string
+  finishedAt?: string
+  status: SessionStatus
   games: Game[]
   ratings: RatingsByUser
-  history: ComparisonRecord[]
+  comparisons: ComparisonRecord[]
   currentMatchup?: Matchup
-  importedAt?: string
+  importedAt: string
+  summary?: SummaryStats
+  finalRankings?: FrozenRankings
+}
+
+export type AppState = {
+  sessions: RankingSession[]
+  activeSessionId?: string
 }
 
 export type RankingTab = 'combined' | 'Brian' | 'Sarah'

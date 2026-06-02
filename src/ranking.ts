@@ -1,4 +1,13 @@
-import type { AppState, ComparisonRecord, Game, Matchup, PlayerRating, RatingsByUser, UserName } from './types'
+import type {
+  ComparisonRecord,
+  FrozenRankings,
+  Game,
+  Matchup,
+  PlayerRating,
+  RankingSession,
+  RatingsByUser,
+  UserName,
+} from './types'
 
 const STARTING_ELO = 1000
 const K_FACTOR = 32
@@ -14,11 +23,11 @@ export function createInitialRatings(games: Game[]): RatingsByUser {
   }, {} as RatingsByUser)
 }
 
-export function ensureRatings(state: AppState): RatingsByUser {
-  const ratings = structuredClone(state.ratings || createInitialRatings([]))
+export function ensureRatings(session: RankingSession): RatingsByUser {
+  const ratings = structuredClone(session.ratings || createInitialRatings([]))
   USERS.forEach((user) => {
     ratings[user] ||= {}
-    state.games.forEach((game) => {
+    session.games.forEach((game) => {
       ratings[user][game.id] ||= { elo: STARTING_ELO, comparisons: 0, wins: 0 }
     })
   })
@@ -45,8 +54,9 @@ export function applyChoice(ratings: RatingsByUser, user: UserName, winnerId: st
   return next
 }
 
-export function applyComparison(state: AppState, leftId: string, rightId: string, choices: Record<UserName, string>): AppState {
-  let ratings = ensureRatings(state)
+export function applyComparison(session: RankingSession, leftId: string, rightId: string, choices: Record<UserName, string>): RankingSession {
+  if (session.status === 'finished') return session
+  let ratings = ensureRatings(session)
   USERS.forEach((user) => {
     const winnerId = choices[user]
     const loserId = winnerId === leftId ? rightId : leftId
@@ -62,16 +72,17 @@ export function applyComparison(state: AppState, leftId: string, rightId: string
     Sarah: choices.Sarah,
   }
 
-  const nextState = { ...state, ratings, history: [...state.history, record] }
-  return { ...nextState, currentMatchup: chooseNextMatchup(nextState) }
+  const nextSession = { ...session, ratings, comparisons: [...session.comparisons, record] }
+  return { ...nextSession, currentMatchup: chooseNextMatchup(nextSession) }
 }
 
-export function excludeGame(state: AppState, gameId: string, reason: string): AppState {
-  const games = state.games.map((game) =>
+export function excludeGame(session: RankingSession, gameId: string, reason: string): RankingSession {
+  if (session.status === 'finished') return session
+  const games = session.games.map((game) =>
     game.id === gameId ? { ...game, excluded: true, excludedReason: reason } : game,
   )
-  const nextState = { ...state, games }
-  return { ...nextState, currentMatchup: chooseNextMatchup(nextState) }
+  const nextSession = { ...session, games }
+  return { ...nextSession, currentMatchup: chooseNextMatchup(nextSession) }
 }
 
 function pairKey(a: string, b: string) {
@@ -90,13 +101,14 @@ function disagreement(ratings: RatingsByUser, id: string) {
   return Math.abs((ratings.Brian[id]?.elo || STARTING_ELO) - (ratings.Sarah[id]?.elo || STARTING_ELO))
 }
 
-export function chooseNextMatchup(state: AppState): Matchup | undefined {
-  const activeGames = state.games.filter((game) => !game.excluded)
+export function chooseNextMatchup(session: RankingSession): Matchup | undefined {
+  if (session.status === 'finished') return undefined
+  const activeGames = session.games.filter((game) => !game.excluded)
   if (activeGames.length < 2) return undefined
 
-  const ratings = ensureRatings(state)
-  const totalComparisons = state.history.length
-  const seenPairs = state.history.reduce<Record<string, number>>((pairs, item) => {
+  const ratings = ensureRatings(session)
+  const totalComparisons = session.comparisons.length
+  const seenPairs = session.comparisons.reduce<Record<string, number>>((pairs, item) => {
     const key = pairKey(item.leftGameId, item.rightGameId)
     pairs[key] = (pairs[key] || 0) + 1
     return pairs
@@ -139,9 +151,9 @@ export function chooseNextMatchup(state: AppState): Matchup | undefined {
   return best?.pair
 }
 
-export function rankedGames(state: AppState, tab: 'combined' | UserName) {
-  const ratings = ensureRatings(state)
-  return state.games
+export function rankedGames(session: RankingSession, tab: 'combined' | UserName) {
+  const ratings = ensureRatings(session)
+  return session.games
     .filter((game) => !game.excluded)
     .map((game) => {
       const brian = ratings.Brian[game.id]
@@ -159,19 +171,46 @@ export function rankedGames(state: AppState, tab: 'combined' | UserName) {
     .sort((a, b) => b.rating.elo - a.rating.elo)
 }
 
-export function summaryStats(state: AppState) {
-  const combined = rankedGames(state, 'combined')
-  const active = state.games.filter((game) => !game.excluded)
-  const agreements = state.history.filter((record) => record.Brian === record.Sarah).length
+export function summaryStats(session: RankingSession) {
+  const combined = rankedGames(session, 'combined')
+  const active = session.games.filter((game) => !game.excluded)
+  const ratings = ensureRatings(session)
+  const agreements = session.comparisons.filter((record) => record.Brian === record.Sarah).length
   const divisive = active
-    .map((game) => ({ game, gap: disagreement(ensureRatings(state), game.id) }))
+    .map((game) => ({ game, gap: disagreement(ratings, game.id) }))
     .sort((a, b) => b.gap - a.gap)[0]
 
   return {
-    comparisons: state.history.length,
-    excluded: state.games.filter((game) => game.excluded).length,
-    agreement: state.history.length ? Math.round((agreements / state.history.length) * 100) : 0,
+    comparisons: session.comparisons.length,
+    excluded: session.games.filter((game) => game.excluded).length,
+    agreement: session.comparisons.length ? Math.round((agreements / session.comparisons.length) * 100) : 0,
     mostDivisive: divisive?.game.title || 'Not enough data yet',
     topShared: combined[0]?.game.title || 'Not enough data yet',
+  }
+}
+
+export function freezeRankings(session: RankingSession): FrozenRankings {
+  return {
+    combined: rankedGames(session, 'combined').map(({ game, rating }, index) => ({
+      rank: index + 1,
+      gameId: game.id,
+      title: game.title,
+      elo: rating.elo,
+      comparisons: rating.comparisons,
+    })),
+    Brian: rankedGames(session, 'Brian').map(({ game, rating }, index) => ({
+      rank: index + 1,
+      gameId: game.id,
+      title: game.title,
+      elo: rating.elo,
+      comparisons: rating.comparisons,
+    })),
+    Sarah: rankedGames(session, 'Sarah').map(({ game, rating }, index) => ({
+      rank: index + 1,
+      gameId: game.id,
+      title: game.title,
+      elo: rating.elo,
+      comparisons: rating.comparisons,
+    })),
   }
 }

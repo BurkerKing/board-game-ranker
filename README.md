@@ -40,6 +40,21 @@ Anyone with the link -> Viewer
 
 The app imports game titles and metadata from the public CSV export of the sheet.
 
+Expected columns:
+
+```text
+A: Game title
+B: BGG Rating
+C: Our Rating
+D-K: Player counts 1-8
+L: Best player count
+M: Times played
+N: Last played
+O: Image URL (optional)
+```
+
+If column O contains a direct `http` or `https` image URL, the app uses it as the board game cover. If it is blank, the app shows the existing title placeholder.
+
 ## Offline Notes
 
 The app has basic PWA caching, so the installed app shell should keep opening after it has been loaded once. The first import needs internet access. Progress saves continuously on the device.
