@@ -84,37 +84,36 @@ export async function importGamesFromSheet(): Promise<Game[]> {
 
   if (!csv) {
     throw new Error(
-      `${lastError || 'Could not load the Google Sheet.'} Make sure the sheet is shared as “Anyone with the link can view”.`,
+      `${lastError || 'Could not load the Google Sheet.'} Make sure the sheet is shared as "Anyone with the link can view".`,
     )
   }
 
   const rows = parseCsv(csv).filter((row) => row.some(Boolean))
   const dataRows = rows[0]?.[0]?.toLowerCase().includes('game') ? rows.slice(1) : rows
   const now = new Date().toISOString()
-
   const games: Game[] = []
 
   dataRows.forEach((row, index) => {
-      const title = row[0]?.trim()
-      if (!title) return
-      const playerCounts = row
-        .slice(3, 11)
-        .map((value, playerIndex) => (value.trim() ? playerIndex + 1 : undefined))
-        .filter((value): value is number => Boolean(value))
+    const title = row[0]?.trim()
+    if (!title) return
+    const playerCounts = row
+      .slice(3, 11)
+      .map((value, playerIndex) => (value.trim() ? playerIndex + 1 : undefined))
+      .filter((value): value is number => Boolean(value))
 
-      games.push({
-        id: `${slugifyTitle(title)}-${index}`,
-        title,
-        bggRating: parseNumber(row[1] || ''),
-        ourRating: parseNumber(row[2] || ''),
-        playerCounts,
-        bestPlayerCount: row[11]?.trim() || undefined,
-        playedCount: parseNumber(row[12] || ''),
-        lastPlayed: row[13]?.trim() || undefined,
-        thumbnailUrl: parseImageUrl(row[14] || ''),
-        createdAt: now,
-      })
+    games.push({
+      id: `${slugifyTitle(title)}-${index}`,
+      title,
+      bggRating: parseNumber(row[1] || ''),
+      ourRating: parseNumber(row[2] || ''),
+      playerCounts,
+      bestPlayerCount: row[11]?.trim() || undefined,
+      playedCount: parseNumber(row[12] || ''),
+      lastPlayed: row[13]?.trim() || undefined,
+      thumbnailUrl: parseImageUrl(row[14] || ''),
+      createdAt: now,
     })
+  })
 
   return games
 }

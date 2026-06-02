@@ -106,6 +106,14 @@ export function chooseNextMatchup(session: RankingSession): Matchup | undefined 
   const activeGames = session.games.filter((game) => !game.excluded)
   if (activeGames.length < 2) return undefined
 
+  if (session.comparisons.length === 0) {
+    const firstGameWithImage = activeGames.find((game) => game.thumbnailUrl)
+    const fallbackOpponent = activeGames.find((game) => game.id !== firstGameWithImage?.id)
+    if (firstGameWithImage && fallbackOpponent) {
+      return { leftId: firstGameWithImage.id, rightId: fallbackOpponent.id }
+    }
+  }
+
   const ratings = ensureRatings(session)
   const totalComparisons = session.comparisons.length
   const seenPairs = session.comparisons.reduce<Record<string, number>>((pairs, item) => {
