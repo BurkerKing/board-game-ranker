@@ -55,6 +55,8 @@ O: Image URL (optional)
 
 If column O contains a direct `http` or `https` image URL, the app uses it as the board game cover. If it is blank, the app shows the existing title placeholder.
 
+Solo-only games are skipped on import. A game counts as solo-only when column D has `X` and columns E-K have no `X`. Games that support 1 player plus another player count are still imported.
+
 ## Offline Notes
 
 The app has basic PWA caching, so the installed app shell should keep opening after it has been loaded once. The first import needs internet access. Progress saves continuously on the device.

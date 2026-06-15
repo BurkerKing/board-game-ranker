@@ -17,6 +17,16 @@ function parseImageUrl(value: string): string | undefined {
   return /^https?:\/\//i.test(url) ? url : undefined
 }
 
+function isMarkedPlayerCount(value: string) {
+  return value.trim().toLowerCase() === 'x'
+}
+
+function isSoloOnlyGame(row: string[]) {
+  const onePlayerMarked = isMarkedPlayerCount(row[3] || '')
+  const otherPlayerCountsMarked = row.slice(4, 11).some(isMarkedPlayerCount)
+  return onePlayerMarked && !otherPlayerCountsMarked
+}
+
 function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []
@@ -96,9 +106,11 @@ export async function importGamesFromSheet(): Promise<Game[]> {
   dataRows.forEach((row, index) => {
     const title = row[0]?.trim()
     if (!title) return
+    if (isSoloOnlyGame(row)) return
+
     const playerCounts = row
       .slice(3, 11)
-      .map((value, playerIndex) => (value.trim() ? playerIndex + 1 : undefined))
+      .map((value, playerIndex) => (isMarkedPlayerCount(value) ? playerIndex + 1 : undefined))
       .filter((value): value is number => Boolean(value))
 
     games.push({
