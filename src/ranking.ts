@@ -11,6 +11,7 @@ import type {
 
 const STARTING_ELO = 1000
 const K_FACTOR = 32
+const COMPARISON_BAND_SIZE = 8
 const USERS: UserName[] = ['Brian', 'Sarah']
 
 export function createInitialRatings(games: Game[]): RatingsByUser {
@@ -55,7 +56,7 @@ export function applyChoice(ratings: RatingsByUser, user: UserName, winnerId: st
 }
 
 export function applyComparison(session: RankingSession, leftId: string, rightId: string, choices: Record<UserName, string>): RankingSession {
-  if (session.status === 'finished') return session
+  if (!isMatchupEligible(session, { leftId, rightId })) return session
   let ratings = ensureRatings(session)
   USERS.forEach((user) => {
     const winnerId = choices[user]
@@ -101,20 +102,41 @@ function disagreement(ratings: RatingsByUser, id: string) {
   return Math.abs((ratings.Brian[id]?.elo || STARTING_ELO) - (ratings.Sarah[id]?.elo || STARTING_ELO))
 }
 
-export function chooseNextMatchup(session: RankingSession): Matchup | undefined {
-  if (session.status === 'finished') return undefined
-  const activeGames = session.games.filter((game) => !game.excluded)
-  if (activeGames.length < 2) return undefined
-
-  if (session.comparisons.length === 0) {
-    const firstGameWithImage = activeGames.find((game) => game.thumbnailUrl)
-    const fallbackOpponent = activeGames.find((game) => game.id !== firstGameWithImage?.id)
-    if (firstGameWithImage && fallbackOpponent) {
-      return { leftId: firstGameWithImage.id, rightId: fallbackOpponent.id }
-    }
-  }
-
+// Counts retain the existing display semantics: average Brian/Sarah appearances.
+// Only active games set the ceiling. Historical counts are never reset.
+function matchupEligibility(session: RankingSession) {
   const ratings = ensureRatings(session)
+  const active = session.status === 'finished' ? [] : session.games.filter((game) => !game.excluded)
+  const count = (game: Game) => averageComparisonCount(ratings, game.id)
+  const minimum = active.reduce((min, game) => Math.min(min, count(game)), Infinity)
+  const ceiling = (Math.floor(minimum / COMPARISON_BAND_SIZE) + 1) * COMPARISON_BAND_SIZE
+  const eligible = active.filter((game) => count(game) < ceiling)
+
+  // A pair needs two games. If only one is below the ceiling, it MUST play;
+  // allow only the least-compared other active games as opponents. This can
+  // take an opponent one above the ceiling (or increment a historical outlier
+  // if no lower opponent exists). Never open the whole next band early.
+  const opponents = eligible.length === 1 ? active.filter((game) => game.id !== eligible[0].id) : []
+  const opponentMinimum = opponents.reduce((min, game) => Math.min(min, count(game)), Infinity)
+  const candidates = eligible.length === 1
+    ? [...eligible, ...opponents.filter((game) => count(game) === opponentMinimum)]
+    : eligible
+  const requiredId = eligible.length === 1 ? eligible[0].id : undefined
+  return { ratings, active, candidates, requiredId }
+}
+
+export function isMatchupEligible(session: RankingSession, matchup: Matchup): boolean {
+  const { candidates, requiredId } = matchupEligibility(session)
+  return matchup.leftId !== matchup.rightId &&
+    candidates.some((game) => game.id === matchup.leftId) &&
+    candidates.some((game) => game.id === matchup.rightId) &&
+    (!requiredId || matchup.leftId === requiredId || matchup.rightId === requiredId)
+}
+
+export function chooseNextMatchup(session: RankingSession): Matchup | undefined {
+  const { ratings, active: activeGames, candidates, requiredId } = matchupEligibility(session)
+  if (candidates.length < 2) return undefined
+
   const totalComparisons = session.comparisons.length
   const seenPairs = session.comparisons.reduce<Record<string, number>>((pairs, item) => {
     const key = pairKey(item.leftGameId, item.rightGameId)
@@ -122,12 +144,13 @@ export function chooseNextMatchup(session: RankingSession): Matchup | undefined 
     return pairs
   }, {})
 
-  let best: { pair: Matchup; score: number } | undefined
+  let best: { pair: Matchup; score: number; repeats: number } | undefined
 
-  for (let i = 0; i < activeGames.length; i += 1) {
-    for (let j = i + 1; j < activeGames.length; j += 1) {
-      const left = activeGames[i]
-      const right = activeGames[j]
+  for (let i = 0; i < candidates.length; i += 1) {
+    for (let j = i + 1; j < candidates.length; j += 1) {
+      const left = candidates[i]
+      const right = candidates[j]
+      if (requiredId && left.id !== requiredId && right.id !== requiredId) continue
       const key = pairKey(left.id, right.id)
       const repeats = seenPairs[key] || 0
       const leftCount = averageComparisonCount(ratings, left.id)
@@ -150,8 +173,9 @@ export function chooseNextMatchup(session: RankingSession): Matchup | undefined 
         noise -
         repeatPenalty
 
-      if (!best || score > best.score) {
-        best = { pair: { leftId: left.id, rightId: right.id }, score }
+      // Repeat avoidance is bounded by eligibility, never allowed to override it.
+      if (!best || repeats < best.repeats || (repeats === best.repeats && score > best.score)) {
+        best = { pair: { leftId: left.id, rightId: right.id }, score, repeats }
       }
     }
   }

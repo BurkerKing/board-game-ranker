@@ -2,8 +2,8 @@ import { BarChart3, Check, Download, FileDown, Play, RefreshCcw, SquareCheckBig,
 import type { Dispatch, SetStateAction, SyntheticEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { importGamesFromSheet } from './importSheet'
-import { applyComparison, chooseNextMatchup, excludeGame, freezeRankings, rankedGames, summaryStats } from './ranking'
-import { createSession, createState, loadState, resetState, saveState } from './storage'
+import { applyComparison, chooseNextMatchup, isMatchupEligible, excludeGame, freezeRankings, rankedGames, summaryStats } from './ranking'
+import { createSession, createState, exportBackup, loadState, parseBackup, readStoredData, resetState, restoreBackup, saveState } from './storage'
 import type { AppState, Game, RankingSession, RankingTab, UserName } from './types'
 
 type Screen = 'compare' | 'rankings' | 'summary' | 'sessions'
@@ -30,8 +30,11 @@ function downloadText(filename: string, text: string, type: string) {
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  // Safari may consume the URL after the click handler returns.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 function csvCell(value: string | number | undefined) {
@@ -243,7 +246,9 @@ function CompareScreen({
   session: RankingSession
   setSession: Dispatch<SetStateAction<RankingSession>>
 }) {
-  const matchup = session.currentMatchup || chooseNextMatchup(session)
+  const matchup = session.currentMatchup && isMatchupEligible(session, session.currentMatchup)
+    ? session.currentMatchup
+    : chooseNextMatchup(session)
   const left = session.games.find((game) => game.id === matchup?.leftId)
   const right = session.games.find((game) => game.id === matchup?.rightId)
   const [choices, setChoices] = useState<Choices>({ Brian: undefined, Sarah: undefined })
@@ -597,8 +602,116 @@ function SessionsScreen({
   )
 }
 
+function BackupControls({ state, onRestore, recovery = false, hasLoadedData = true }: {
+  state: AppState
+  onRestore: (state: AppState) => void
+  recovery?: boolean
+  hasLoadedData?: boolean
+}) {
+  const [message, setMessage] = useState('')
+  const [pending, setPending] = useState<{ state: AppState; original: Record<string, string | null> }>()
+  const [busy, setBusy] = useState(false)
+  const [downloadFallback, setDownloadFallback] = useState<{ filename: string; contents: string }>()
+  const buttonClass = 'min-h-12 rounded-md border border-amber-200 bg-white px-3 py-2 text-base font-bold text-lagoon'
+
+  async function exportAll() {
+    setMessage('')
+    setDownloadFallback(undefined)
+    try {
+      const rawOnly = !hasLoadedData
+      const contents = rawOnly
+        ? JSON.stringify({ format: 'board-game-ranker-recovery', version: 1, exportedAt: new Date().toISOString(), storedData: readStoredData() }, null, 2)
+        : exportBackup(state)
+      const filename = `board-game-ranker-${rawOnly ? 'recovery' : 'backup'}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      const file = new File([contents], filename, { type: 'application/json' })
+      // Called directly from a tap, preserving Safari's user activation.
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Board Game Ranker backup' })
+          setMessage('Use Save to Files in the share sheet to keep your backup.')
+          return
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return
+          // Some installed-app contexts advertise sharing but deny the call.
+          // A second explicit tap also preserves user activation if an installed
+          // app blocks the automatic download after an asynchronous share failure.
+          setDownloadFallback({ filename, contents })
+        }
+      }
+      downloadText(filename, contents, 'application/json')
+      setMessage('Backup download requested. Check Downloads or Files before replacing any data.')
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      setMessage(error instanceof Error ? error.message : 'Backup export failed. Your saved data was not changed.')
+    }
+  }
+
+  async function selectBackup(file?: File) {
+    setPending(undefined)
+    setMessage('')
+    if (!file) return
+    setBusy(true)
+    try {
+      // Capture before the asynchronous file read, then recheck on confirmation.
+      const original = readStoredData()
+      const restored = parseBackup(await file.text())
+      setPending({ state: restored, original })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'This backup could not be read.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function confirmRestore() {
+    if (!pending || !window.confirm('Replace all sessions on this device with this backup? Export your current data first. This cannot be undone in the app.')) return
+    try {
+      const restored = restoreBackup(pending.state, pending.original, true)
+      onRestore(restored)
+      setPending(undefined)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Restore failed. Existing data was not replaced.')
+    }
+  }
+
+  return (
+    <section aria-label="Data backup" className="mx-auto w-full max-w-md space-y-3 px-4 py-3">
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className={buttonClass} onClick={exportAll}>{hasLoadedData ? 'Export Backup' : 'Export Saved Data'}</button>
+        <label className={`${buttonClass} flex cursor-pointer items-center justify-center text-center`}>
+          {busy ? 'Reading backup…' : 'Import Backup'}
+          <input type="file" accept=".json,application/json" disabled={busy} className="sr-only" onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            void selectBackup(file)
+          }} />
+        </label>
+      </div>
+      {recovery && <p className="text-sm text-stone-700">{hasLoadedData ? 'Export Backup preserves the currently loaded data, including unsaved progress.' : 'Export Saved Data preserves the original stored text for recovery; a damaged recovery file is not a restorable backup.'} Import a complete backup only when you are ready to replace saved sessions.</p>}
+      {pending && <div className="space-y-2 rounded-md border border-amber-200 bg-linen p-3">
+        <p className="text-sm font-bold">Backup checked: {pending.state.sessions.length} sessions, {pending.state.sessions.reduce((n, session) => n + session.games.length, 0)} game entries, {pending.state.sessions.reduce((n, session) => n + session.comparisons.length, 0)} completed comparisons.</p>
+        <p className="text-sm">Restoring replaces all current sessions. Export your current data first.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className={buttonClass} onClick={confirmRestore}>Restore Backup</button>
+          <button type="button" className={buttonClass} onClick={() => setPending(undefined)}>Cancel</button>
+        </div>
+      </div>}
+      {downloadFallback && <button type="button" className={buttonClass} onClick={() => downloadText(downloadFallback.filename, downloadFallback.contents, 'application/json')}>Download Backup</button>}
+      {downloadFallback && <p className="text-sm text-stone-700">If no file appeared, tap Download Backup to save it directly.</p>}
+      {message && <p role="status" className="break-words text-sm font-semibold text-clay">{message}</p>}
+    </section>
+  )
+}
+
 export default function App() {
-  const [state, setState] = useState<AppState>(() => loadState())
+  const [initial] = useState(() => {
+    try { return { state: loadState(), warning: undefined as string | undefined, loaded: true } }
+    catch (error) { return { state: createState(), warning: error instanceof Error ? error.message : 'Saved data could not be read.', loaded: false } }
+  })
+  const [state, setState] = useState<AppState>(initial.state)
+  const [recoveryWarning, setRecoveryWarning] = useState(initial.warning)
+  const [hasLoadedData, setHasLoadedData] = useState(initial.loaded)
+  const [restoreNotice, setRestoreNotice] = useState('')
   const [screen, setScreen] = useState<Screen>('compare')
   const [isImporting, setIsImporting] = useState(false)
   const [error, setError] = useState<string>()
@@ -606,8 +719,24 @@ export default function App() {
   const activeSession = state.sessions.find((session) => session.sessionId === state.activeSessionId)
 
   useEffect(() => {
-    saveState(state)
-  }, [state])
+    if (recoveryWarning) return
+    try { saveState(state) }
+    catch (error) { setRecoveryWarning(error instanceof Error ? error.message : 'Progress could not be saved.') }
+  }, [state, recoveryWarning])
+
+  function acceptRestored(restored: AppState, notice = 'Backup restored. All sessions are available on this device.') {
+    setRestoreNotice(notice)
+    setState(restored)
+    setHasLoadedData(true)
+    setRecoveryWarning(undefined)
+    setScreen('sessions')
+  }
+
+  function retryStorage() {
+    if (hasLoadedData && !window.confirm('Reload the saved data on this device? Unsaved changes on this page will be discarded. Export Backup first to preserve them.')) return
+    try { acceptRestored(loadState(), 'Saved data reloaded successfully.') }
+    catch (error) { setRecoveryWarning(error instanceof Error ? error.message : 'Storage is still unavailable.') }
+  }
 
   function setActiveSession(updater: SetStateAction<RankingSession>) {
     setState((current) => {
@@ -682,13 +811,27 @@ export default function App() {
   }
 
   function clearAll() {
+    if (!window.confirm('Delete all sessions from this device? Export Backup first. This cannot be undone.')) return
     resetState()
     setState(createState())
     setScreen('sessions')
   }
 
+  if (recoveryWarning) {
+    return <main className="mx-auto min-h-dvh max-w-md bg-paper px-3 py-10 text-ink">
+      <div role="alert" className="space-y-3 rounded-md border border-clay/30 bg-blush p-4">
+        <h1 className="text-2xl font-black">Saved data needs attention</h1>
+        <p>{recoveryWarning}</p>
+        <p>Automatic saving is paused. Existing saved data has not been cleared or replaced. Keep this page open if it contains unsaved progress.</p>
+        <button type="button" className="min-h-12 rounded-md bg-white px-4 font-bold" onClick={retryStorage}>Retry Saved Data</button>
+        <p className="text-sm">Retry reloads the device’s saved data. Export any loaded progress first; unsaved changes will be replaced when retry succeeds.</p>
+      </div>
+      <BackupControls state={state} onRestore={acceptRestored} recovery hasLoadedData={hasLoadedData} />
+    </main>
+  }
+
   if (!state.sessions.length) {
-    return <StartSessionPanel onStart={startSession} isImporting={isImporting} error={error} />
+    return <>{restoreNotice && <p role="status" className="px-4 py-2 text-sm font-bold text-lagoon">{restoreNotice}</p>}<BackupControls state={state} onRestore={acceptRestored} /><StartSessionPanel onStart={startSession} isImporting={isImporting} error={error} /></>
   }
 
   return (
@@ -712,6 +855,9 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {restoreNotice && <p role="status" className="px-4 py-2 text-sm font-bold text-lagoon">{restoreNotice}</p>}
+      <BackupControls state={state} onRestore={acceptRestored} />
 
       {screen === 'compare' && activeSession && <CompareScreen session={activeSession} setSession={setActiveSession} />}
       {screen === 'rankings' && activeSession && <RankingsScreen session={activeSession} />}
